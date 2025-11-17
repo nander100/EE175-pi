@@ -25,7 +25,11 @@ class SimpleArmIK(Node):
         
         # Sensitivity scaling (less than 1.0 = less sensitive, more range)
         self.sensitivity = 0.3    # ADJUST: Lower = less sensitive, more hand movement needed
-        
+
+        # Axis inversion flags - adjust these if directions are wrong
+        self.invert_z = False  # Set True if forward/back is reversed
+        self.invert_y = True   # Set True if up/down is reversed
+
         # Setup servos
         factory = LGPIOFactory(chip=4)
         self.servo1 = Servo(27, min_pulse_width=1.0/1000, max_pulse_width=2.0/1000, pin_factory=factory)  # Base
@@ -40,11 +44,16 @@ class SimpleArmIK(Node):
     def callback(self, msg):
         z = msg.data[2]  # Hand z (depth/out)
         y = msg.data[1]  # Hand y (vertical/up)
-        
-        # Use y-axis, flip direction for your config
+
+        # Apply axis inversions if needed
+        if self.invert_z:
+            z = -z
+        if self.invert_y:
+            y = -y
+
         # Apply sensitivity scaling for more range
         arm_z = z * self.sensitivity
-        arm_y = -y * self.sensitivity
+        arm_y = y * self.sensitivity
         
         # Check if reachable
         distance = math.sqrt(arm_z**2 + arm_y**2)
