@@ -11,18 +11,23 @@ class SimpleArmIK(Node):
         super().__init__('simple_arm_ik')
         
         # Arm dimensions
-        self.a1 = 0.16    # Link 1 length (meters)
-        self.a2 = 0.0865  # Link 2 length (meters)
-        
+        self.a1 = 0.15    # Link 1 length: 150mm (base arm)
+        self.a2 = 0.18    # Link 2 length: 180mm (second arm)
+        self.base_height = 0.1  # Base mounted 100mm above ground
+
         # Workspace limits
-        self.max_reach = self.a1 + self.a2  # 0.2465 m
-        self.min_reach = abs(self.a1 - self.a2)  # 0.0735 m
+        self.max_reach = self.a1 + self.a2  # 0.33 m
+        self.min_reach = abs(self.a1 - self.a2)  # 0.03 m
         
         # Servo configuration
         self.servo1_offset = 45   # Servo 0° is actually 45° from base
         self.servo1_min = -80     # Base intersection limit
         self.servo1_max = 90      # Max angle
-        
+
+        # Servo direction configuration
+        self.servo1_ccw_positive = True   # Servo1: positive = counter-clockwise
+        self.servo2_ccw_positive = False  # Servo2: positive = clockwise (inverted)
+
         # Sensitivity scaling (less than 1.0 = less sensitive, more range)
         self.sensitivity = 0.3    # ADJUST: Lower = less sensitive, more hand movement needed
 
@@ -50,6 +55,9 @@ class SimpleArmIK(Node):
             z = -z
         if self.invert_y:
             y = -y
+
+        # Account for base height offset
+        y = y - self.base_height
 
         # Apply sensitivity scaling for more range
         arm_z = z * self.sensitivity
@@ -94,10 +102,14 @@ class SimpleArmIK(Node):
         # Clamp to servo limits
         q1_deg_actual = max(self.servo1_min, min(self.servo1_max, q1_deg_actual))
         q2_deg = max(-90, min(90, q2_deg))
-        
+
+        # Apply servo direction inversions
+        servo1_cmd = q1_deg_actual if self.servo1_ccw_positive else -q1_deg_actual
+        servo2_cmd = q2_deg if self.servo2_ccw_positive else -q2_deg
+
         # Move servos (convert to -1 to +1 range)
-        self.servo1.value = q1_deg_actual / 90.0
-        self.servo2.value = q2_deg / 90.0
+        self.servo1.value = servo1_cmd / 90.0
+        self.servo2.value = servo2_cmd / 90.0
         
         self.get_logger().info(f'Hand: ({z:.3f}, {y:.3f}) → q1={q1_deg_actual:.1f}° q2={q2_deg:.1f}°')
 
