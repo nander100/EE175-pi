@@ -24,8 +24,19 @@ class SimpleArmIK(Node):
         self.servo1_max = 90      # Max angle
         
         # Motion amplification (greater than 1.0 = amplify hand movements to larger arm movements)
+        # NOTE: Since neutral is at max_reach, only inward movement is possible.
+        # Higher amplification = more responsive but smaller usable camera range
         self.amplification_factor = 2.5    # ADJUST: Higher = small hand movements create larger arm movements
-        
+
+        # Neutral/home positions
+        # Camera neutral: hand at [0, 0, 0.5] (half meter away)
+        self.neutral_hand_z = 0.5
+        self.neutral_hand_y = 0.0
+
+        # Arm neutral: fully extended (q1=0°, q2=0°) → arm_z = a1+a2, arm_y = 0
+        self.neutral_arm_z = self.a1 + self.a2  # 0.2465m
+        self.neutral_arm_y = 0.0
+
         # Setup servos
         factory = LGPIOFactory(chip=4)
         self.servo1 = Servo(27, min_pulse_width=1.0/1000, max_pulse_width=2.0/1000, pin_factory=factory)  # Base
@@ -40,11 +51,18 @@ class SimpleArmIK(Node):
     def callback(self, msg):
         z = msg.data[2]  # Hand z (depth/out)
         y = msg.data[1]  # Hand y (vertical/up)
-        
-        # Use y-axis, flip direction for your config
-        # Apply amplification so small hand movements create larger arm movements
-        arm_z = z * self.amplification_factor
-        arm_y = -y * self.amplification_factor
+
+        # Calculate offset from neutral position in camera space
+        offset_z = z - self.neutral_hand_z
+        offset_y = y - self.neutral_hand_y
+
+        # Amplify the offset (not the absolute position)
+        amplified_offset_z = offset_z * self.amplification_factor
+        amplified_offset_y = -offset_y * self.amplification_factor  # Flip y direction
+
+        # Apply to arm neutral position
+        arm_z = self.neutral_arm_z + amplified_offset_z
+        arm_y = self.neutral_arm_y + amplified_offset_y
         
         # Check if reachable
         distance = math.sqrt(arm_z**2 + arm_y**2)
@@ -90,7 +108,7 @@ class SimpleArmIK(Node):
         self.servo1.value = q1_deg_actual / 90.0
         self.servo2.value = q2_deg / 90.0
         
-        self.get_logger().info(f'Hand: ({z:.3f}, {y:.3f}) → q1={q1_deg_actual:.1f}° q2={q2_deg:.1f}°')
+        self.get_logger().info(f'Hand: ({z:.3f}, {y:.3f}) Offset: ({offset_z:.3f}, {offset_y:.3f}) → Arm: ({arm_z:.3f}, {arm_y:.3f}) → q1={q1_deg_actual:.1f}° q2={q2_deg:.1f}°')
 
 def main():
     rclpy.init()
