@@ -23,8 +23,8 @@ class SimpleArmIK(Node):
         self.servo1_min = -80     # Base intersection limit
         self.servo1_max = 90      # Max angle
         
-        # Sensitivity scaling (less than 1.0 = less sensitive, more range)
-        self.sensitivity = 0.3    # ADJUST: Lower = less sensitive, more hand movement needed
+        # Motion amplification (greater than 1.0 = amplify hand movements to larger arm movements)
+        self.amplification_factor = 2.5    # ADJUST: Higher = small hand movements create larger arm movements
         
         # Setup servos
         factory = LGPIOFactory(chip=4)
@@ -42,9 +42,9 @@ class SimpleArmIK(Node):
         y = msg.data[1]  # Hand y (vertical/up)
         
         # Use y-axis, flip direction for your config
-        # Apply sensitivity scaling for more range
-        arm_z = z * self.sensitivity
-        arm_y = -y * self.sensitivity
+        # Apply amplification so small hand movements create larger arm movements
+        arm_z = z * self.amplification_factor
+        arm_y = -y * self.amplification_factor
         
         # Check if reachable
         distance = math.sqrt(arm_z**2 + arm_y**2)
