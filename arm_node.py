@@ -24,17 +24,19 @@ class SimpleArmIK(Node):
         self.servo1_max = 90      # Max angle
         
         # Motion amplification (greater than 1.0 = amplify hand movements to larger arm movements)
-        # NOTE: Since neutral is at max_reach, only inward movement is possible.
-        # Higher amplification = more responsive but smaller usable camera range
-        self.amplification_factor = 2.5    # ADJUST: Higher = small hand movements create larger arm movements
+        # NOTE: Hand range (0.3-0.9m span) is LARGER than arm workspace (0.17m span)
+        # So we use <1.0 to fit hand motion into arm workspace, preserving relative motion
+        self.amplification_factor = 0.7    # ADJUST carefully - workspace is limited!
 
         # Neutral/home positions
-        # Camera neutral: hand at [0, 0, 0.5] (half meter away)
-        self.neutral_hand_z = 0.5
+        # Camera neutral: adjusted to center of typical hand position range
+        # Based on tracking data: hands cluster around 0.3-0.5m
+        self.neutral_hand_z = 0.4    # Center of typical range
         self.neutral_hand_y = 0.0
 
-        # Arm neutral: fully extended (q1=0°, q2=0°) → arm_z = a1+a2, arm_y = 0
-        self.neutral_arm_z = self.a1 + self.a2  # 0.2465m
+        # Arm neutral: positioned in CENTER of workspace for bidirectional movement
+        # This allows arm to move both inward (toward min) and outward (toward max)
+        self.neutral_arm_z = (self.min_reach + self.max_reach) / 2.0  # ~0.16m (center)
         self.neutral_arm_y = 0.0
 
         # Setup servos
