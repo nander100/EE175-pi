@@ -26,7 +26,7 @@ class SimpleArmIK(Node):
         # Motion amplification (greater than 1.0 = amplify hand movements to larger arm movements)
         # NOTE: Hand range (0.3-0.9m span) is LARGER than arm workspace (0.17m span)
         # So we use <1.0 to fit hand motion into arm workspace, preserving relative motion
-        self.amplification_factor = 0.7    # ADJUST carefully - workspace is limited!
+        self.amplification_factor = 0.3   # ADJUST carefully - workspace is limited! CHANGE THIS NUMBER TO WHAT FEELS NICE
 
         # Neutral/home positions
         # Camera neutral: adjusted to center of typical hand position range
@@ -95,7 +95,7 @@ class SimpleArmIK(Node):
         q2_deg = math.degrees(q2)
         
         # Apply servo offset (servo 0° = 45° actual)
-        q1_deg_actual = q1_deg - self.servo1_offset
+        q1_deg_actual = q1_deg + self.servo1_offset
         
         # Check base intersection limit
         if q1_deg_actual < self.servo1_min:
