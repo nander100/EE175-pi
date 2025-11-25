@@ -23,9 +23,22 @@ class SimpleArmIK(Node):
         self.servo1_min = -80     # Base intersection limit
         self.servo1_max = 90      # Max angle
         
-        # Sensitivity scaling (less than 1.0 = less sensitive, more range)
-        self.sensitivity = 0.3    # ADJUST: Lower = less sensitive, more hand movement needed
-        
+        # Motion amplification (greater than 1.0 = amplify hand movements to larger arm movements)
+        # NOTE: Hand range (0.3-0.9m span) is LARGER than arm workspace (0.17m span)
+        # So we use <1.0 to fit hand motion into arm workspace, preserving relative motion
+        self.amplification_factor = 0.3   # ADJUST carefully - workspace is limited! CHANGE THIS NUMBER TO WHAT FEELS NICE
+
+        # Neutral/home positions
+        # Camera neutral: adjusted to center of typical hand position range
+        # Based on tracking data: hands cluster around 0.3-0.5m
+        self.neutral_hand_z = 0.4    # Center of typical range
+        self.neutral_hand_y = 0.0
+
+        # Arm neutral: positioned in CENTER of workspace for bidirectional movement
+        # This allows arm to move both inward (toward min) and outward (toward max)
+        self.neutral_arm_z = (self.min_reach + self.max_reach) / 2.0  # ~0.16m (center)
+        self.neutral_arm_y = 0.0
+
         # Setup servos
         factory = LGPIOFactory(chip=4)
         self.servo1 = Servo(27, min_pulse_width=1.0/1000, max_pulse_width=2.0/1000, pin_factory=factory)  # Base
@@ -40,11 +53,18 @@ class SimpleArmIK(Node):
     def callback(self, msg):
         z = msg.data[2]  # Hand z (depth/out)
         y = msg.data[1]  # Hand y (vertical/up)
-        
-        # Use y-axis, flip direction for your config
-        # Apply sensitivity scaling for more range
-        arm_z = z * self.sensitivity
-        arm_y = -y * self.sensitivity
+
+        # Calculate offset from neutral position in camera space
+        offset_z = z - self.neutral_hand_z
+        offset_y = y - self.neutral_hand_y
+
+        # Amplify the offset (not the absolute position)
+        amplified_offset_z = offset_z * self.amplification_factor
+        amplified_offset_y = -offset_y * self.amplification_factor  # Flip y direction
+
+        # Apply to arm neutral position
+        arm_z = self.neutral_arm_z + amplified_offset_z
+        arm_y = self.neutral_arm_y + amplified_offset_y
         
         # Check if reachable
         distance = math.sqrt(arm_z**2 + arm_y**2)
@@ -75,7 +95,7 @@ class SimpleArmIK(Node):
         q2_deg = math.degrees(q2)
         
         # Apply servo offset (servo 0° = 45° actual)
-        q1_deg_actual = q1_deg - self.servo1_offset
+        q1_deg_actual = q1_deg + self.servo1_offset
         
         # Check base intersection limit
         if q1_deg_actual < self.servo1_min:
@@ -90,7 +110,7 @@ class SimpleArmIK(Node):
         self.servo1.value = q1_deg_actual / 90.0
         self.servo2.value = q2_deg / 90.0
         
-        self.get_logger().info(f'Hand: ({z:.3f}, {y:.3f}) → q1={q1_deg_actual:.1f}° q2={q2_deg:.1f}°')
+        self.get_logger().info(f'Hand: ({z:.3f}, {y:.3f}) Offset: ({offset_z:.3f}, {offset_y:.3f}) → Arm: ({arm_z:.3f}, {arm_y:.3f}) → q1={q1_deg_actual:.1f}° q2={q2_deg:.1f}°')
 
 def main():
     rclpy.init()
